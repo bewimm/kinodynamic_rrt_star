@@ -119,7 +119,7 @@ classdef rrtstar
             parents = [-1];
 
             max_it = 1000;
-            r = 100;
+            r = 40;
 
             goal_cost = inf;
             goal_parent = 0;
@@ -132,19 +132,19 @@ classdef rrtstar
 
                     x_i = sample_free_state();%sample_free_states(state_limits, obstacles, quad_dim);
                     min_idx = 1;
-                    min_cost = 1e40;
+                    min_cost = inf;
                     for jj=1:size(T,2)
                         [cost, time] = evaluate_cost(obj, T(:,jj),x_i);
-                        if costs(jj)+cost < r && costs(jj)+cost < min_cost
+                        if cost < r && costs(jj)+cost < min_cost
                             [states, u] = evaluate_states_and_inputs(obj, T(:,jj),x_i);
                             if  is_state_free(states,[0,time]) && is_input_free(u,[0,time])
                                 sample_ok = true;
                                 min_idx = jj;
                                 min_cost = costs(jj)+cost;
                             end
-
                         end
                     end
+
                 end
 
                 parents = [parents, min_idx];
@@ -152,7 +152,7 @@ classdef rrtstar
 
                 for jj=1:size(T,2)
                     [cost, time] = evaluate_cost(obj, x_i,T(:,jj));
-                    if costs(jj)+cost < r && costs(end)+cost < costs(jj)
+                    if cost < r && costs(end)+cost < costs(jj)
                         [states, u] = evaluate_states_and_inputs(obj, x_i,T(:,jj));
                         if is_state_free(states,[0,time]) && is_input_free(u,[0,time])
                             costs(jj) = costs(end)+cost;

@@ -7,7 +7,7 @@ function [ ok ] = ball_is_state_free( state, state_limits, obstacles, radius, ti
 % - quad_dim contains the size of the quadcopter bounding-box
 
 ok = true;
-max_dist = 1;
+max_dist = .5;
 
 if isa(state,'sym')
 
@@ -63,40 +63,37 @@ end
 end
 
 function [coll] = collides(obstacles, radius, s)
-    n_obs = size(obstacles, 1);
-    coll = false;
-    for ii=1:n_obs
-        obs = obstacles(ii,:)';
-        dist = abs(s(1:2)-obs(1:2));
 
-        if s(1)>obs(1) && s(1)<obs(1)+obs(3) && s(2)>obs(2) && s(2)<obs(2)+obs(4)
-            coll = true;
-            return
-        end
-
-        if (dist(1) > (obs(3)/2 + radius))
-            continue;
-        end
-        if (dist(2) > (obs(4)/2 + radius))
-            continue;
-        end
-
-        if dist(1) <= obs(3)/2
-            coll = true;
-            return
-        end
-        if dist(2) <= obs(4)/2
-            coll = true;
-            return
-        end
-
-        cornerDistance_sq = (dist(1)-obs(3)/2)^2 + (dist(2)-obs(4)/2)^2;
-
-        if cornerDistance_sq <= radius^2
-            coll = true;
-            return
-        end
-
+n_obs = size(obstacles, 1);
+coll = false;
+for ii=1:n_obs
+    
+    obs = obstacles(ii,:)';
+    c_min_bl = s(1:2)-obs(1:2);
+    c_min_tr = s(1:2)-(obs(1:2)+obs(3:4));
+    
+    if s(1)>obs(1) && s(1)<obs(1)+obs(3) && s(2)>obs(2) && s(2)<obs(2)+obs(4)
+        coll = true;
+        return;
     end
+    
+    dist_bot_left  = c_min_bl(1)^2+c_min_bl(2)^2;
+    dist_top_left  = c_min_bl(1)^2+c_min_tr(2)^2;
+    dist_top_right = c_min_tr(1)^2+c_min_tr(2)^2;
+    dist_bot_right = c_min_tr(1)^2+c_min_tr(2)^2;
+    
+    if dist_bot_left <= radius*radius || ...
+            dist_top_left <= radius*radius || ...
+            dist_top_right <= radius*radius || ...
+            dist_bot_right <= radius*radius
+        
+        coll = true;
+        return;
+        
+    end
+    
+    
+end
+            
 end
 

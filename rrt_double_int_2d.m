@@ -30,7 +30,11 @@ c = zeros(state_dims,1);
 
 R = eye(2);
 
-obstacles = [40,10,20,80];
+%obstacles = [40,10,20,80];
+obstacles = [30,0,10,20;
+             30,30,10,70;
+             60,0,10,70;
+             60,80,10,20];
 
 disp(['calculating closed form solution']);
 rrt = rrtstar(A,B,c,R);
