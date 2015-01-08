@@ -18,7 +18,7 @@ state_limits = ...
      -1, 1;
      -5, 5;
      -5, 5];
- 
+
  input_limits = ...
      [ -4.545, 9.935;
        -3.62,3.62;
@@ -26,14 +26,14 @@ state_limits = ...
 
  %load obstacles.mat
  obstacles = [];
- 
- disp(['calulating closed form solution']);
+
+ disp(['calculating closed form solution']);
  rrt = rrtstar(A,B,c,R);
  disp(['starting algorithm']);
- 
+
  state_free = @(state, time_range)(is_state_free(state, state_limits, obstacles, quad_dim, time_range));
  input_free = @(input, time_range)(is_input_free(input, input_limits, time_range));
  sample_state = @()(sample_free_states(state_limits, obstacles, quad_dim ));
- 
- [T, parents] = rrt.run(sample_state, state_free, input_free, start', goal');
- 
+ display = @(obj, tree, parents, goal_cost, goal_parent)(plot_graph(obj, tree, parents, goal_cost, goal_parent));
+
+ [T, parents] = rrt.run(sample_state, state_free, input_free, start', goal', display);

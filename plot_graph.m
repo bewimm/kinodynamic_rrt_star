@@ -1,4 +1,4 @@
-function [ ] = plot_graph( tree, parents )
+function [ ] = plot_graph(obj, tree, parents, goal_cost, goal_parent )
 %PLOT_GRAPH Summary of this function goes here
 %   Detailed explanation goes here
 
