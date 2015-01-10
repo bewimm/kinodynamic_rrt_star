@@ -117,9 +117,10 @@ classdef rrtstar
             T = [start];
             costs = [0];
             parents = [-1];
+            children = {[]};
 
             max_it = 10000;
-            r = 20;
+            r = 1000;
 
             goal_cost = inf;
             goal_parent = 0;
@@ -134,34 +135,68 @@ classdef rrtstar
                     x_i = sample_free_state();%sample_free_states(state_limits, obstacles, quad_dim);
                     min_idx = 1;
                     min_cost = inf;
-                    for jj=1:size(T,2)
-                        [cost, time] = evaluate_cost(obj, T(:,jj),x_i);
-                        if cost < r && costs(jj)+cost < min_cost
-                            [states, u] = evaluate_states_and_inputs(obj, T(:,jj),x_i);
+
+                    queue = 1;
+                    while ~isempty(queue)
+                        node_idx = queue(1);
+                        queue = queue(2:end); %switch with stack to perform DFS instead of BFS
+                        node = T(:,node_idx);
+
+                        [cost, time] = evaluate_cost(obj, node,x_i);
+                        if cost < r && costs(node_idx)+cost < min_cost
+                            [states, u] = evaluate_states_and_inputs(obj, node,x_i);
                             if  is_state_free(states,[0,time]) && is_input_free(u,[0,time])
                                 sample_ok = true;
-                                min_idx = jj;
-                                min_cost = costs(jj)+cost;
+                                min_idx = node_idx;
+                                min_cost = costs(node_idx)+cost;
+                                continue;
                             end
                         end
+                        %if we arrive here it means there is no trajectory from node to new x_i
+                        %however child nodes might be able to form a connection
+                        queue = [queue, children{node_idx}];
                     end
-
                 end
 
                 parents = [parents, min_idx];
+                children{min_idx} = [children{min_idx},it+1];
+                children{it+1} = [];
                 costs = [costs, min_cost];
+                T = [T,x_i];
 
-                %if the cost is changed here all children should be
-                %reevaluated
-                for jj=1:size(T,2)
-                    [cost, time] = evaluate_cost(obj, x_i,T(:,jj));
-                    if cost < r && costs(end)+cost < costs(jj)
-                        [states, u] = evaluate_states_and_inputs(obj, x_i,T(:,jj));
+                %update the tree with new shorter paths (the root node is checked here even though it's not necessary)
+                stack(1).index = 1;
+                stack(1).cost = 0;
+
+                while ~isempty(stack)
+                    node = stack(end);
+                    stack = stack(1:end-1);
+                    state = T(:,node.index);
+
+                    costs(node.index) = costs(node.index)-node.cost;
+                    diff = node.cost;
+
+                    [cost, time] = evaluate_cost(obj, x_i,state);
+                    if cost < r && costs(end)+cost < costs(node.index)
+                        [states, u] = evaluate_states_and_inputs(obj,x_i,state);
                         if is_state_free(states,[0,time]) && is_input_free(u,[0,time])
-                            costs(jj) = costs(end)+cost;
-                            parents(jj) = size(parents,2);
+
+                            old_cost = costs(node.index);
+                            old_parent = parents(node.index);
+                            costs(node.index) = costs(end)+cost;
+                            parents(node.index) = size(parents,2);
+                            ch = children{old_parent};
+                            children{old_parent} = ch(ch~=node.index);
+
+                            diff = old_cost-costs(node_idx);
                         end
                     end
+
+                    for jj=1:length(children{node.index})
+                       stack(end+1).index = children{node.index}(jj);
+                       stack(end).cost = diff;
+                    end
+
                 end
 
                 [cost, time] = evaluate_cost(obj, x_i, goal);
@@ -169,11 +204,10 @@ classdef rrtstar
                     [states, u] = evaluate_states_and_inputs(obj, x_i,goal);
                     if is_state_free(states,[0,time]) && is_input_free(u,[0,time])
                         goal_cost = costs(end)+cost;
-                        goal_parent = size(T,2)+1;
+                        goal_parent = it+1;
                     end
                 end
 
-                T = [T,x_i];
                 toc;
                 display_scratch = display(display_scratch, obj, T, parents, goal_cost, goal_parent);
 
