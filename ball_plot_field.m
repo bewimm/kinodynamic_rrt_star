@@ -4,10 +4,12 @@ function [ scratch ] = ball_plot_field(scratch, obj, tree, parents, obstacles, g
 
 clf;
 hold on;
-for ii=2:size(tree,2) %root node has no parents -> start with 2
-    src = tree(:,parents(ii));
-    dst = tree(:,ii);
-    draw_trajectory(obj, src, dst, 'blue', 1);
+if false
+    for ii=2:size(tree,2) %root node has no parents -> start with 2
+        src = tree(:,parents(ii));
+        dst = tree(:,ii);
+        draw_trajectory(obj, src, dst, 'blue', 1);
+    end
 end
 
 

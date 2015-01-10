@@ -57,7 +57,7 @@ classdef rrtstar
                 it = it+1;
             end
             if it > 20
-                disp('either the result is not a polynomial or the degree is to high');
+                disp('either the result is not a polynomial or the degree is too high');
             end
 
             p([obj.x0', obj.x1']) = fliplr(p1);
@@ -118,6 +118,7 @@ classdef rrtstar
             costs = [0];
             parents = [-1];
             children = {[]};
+            is_terminal = [false];
 
             max_it = 10000;
             r = 1000;
@@ -141,6 +142,9 @@ classdef rrtstar
                         node_idx = queue(1);
                         queue = queue(2:end); %switch with stack to perform DFS instead of BFS
                         node = T(:,node_idx);
+                        if is_terminal(node_idx)
+                           continue;
+                        end
 
                         [cost, time] = evaluate_cost(obj, node,x_i);
                         if cost < r && costs(node_idx)+cost < min_cost
@@ -163,6 +167,7 @@ classdef rrtstar
                 children{it+1} = [];
                 costs = [costs, min_cost];
                 T = [T,x_i];
+                is_terminal = [is_terminal, false];
 
                 %update the tree with new shorter paths (the root node is checked here even though it's not necessary)
                 stack(1).index = 1;
@@ -172,6 +177,10 @@ classdef rrtstar
                     node = stack(end);
                     stack = stack(1:end-1);
                     state = T(:,node.index);
+
+                    if is_terminal(node.index)
+                       continue;
+                    end
 
                     costs(node.index) = costs(node.index)-node.cost;
                     diff = node.cost;
@@ -205,6 +214,7 @@ classdef rrtstar
                     if is_state_free(states,[0,time]) && is_input_free(u,[0,time])
                         goal_cost = costs(end)+cost;
                         goal_parent = it+1;
+                        is_terminal(end) = true;
                     end
                 end
 
