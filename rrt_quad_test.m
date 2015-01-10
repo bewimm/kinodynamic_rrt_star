@@ -2,38 +2,43 @@
 
 init_quad;
 
-start = [1,1,1, 0,0,0,0,0,0,0];
-goal  = [2,2,1, 0,0,0,0,0,0,0];
+start = [0,0,2, 0,0,0,0,0,0,0];
+goal  = [-3,20,2, 0,0,0,0,0,0,0];
 
-quad_dim = [0.2,0.2,0.05];
+quad_radius = max([w,h,d]);
 
 state_limits = ...
-    [0,5;
-     0,5;
-     0,5;
-     -5,5;
-     -5,5;
-     -5,5;
-     -1, 1;
-     -1, 1;
-     -5, 5;
-     -5, 5];
+    [-10,10; %pos x
+     -1,30;  %pos y
+     0,4;    %pos z
+     -5,5;   %vel x
+     -5,5;   %vel y
+     -5,5;   %vel z
+     -1, 1;  %pitch
+     -1, 1;  %roll
+     -5, 5;  %vel pitch
+     -5, 5]; %vel roll
 
  input_limits = ...
      [ -4.545, 9.935;
        -3.62,3.62;
        -3.62,3.62];
 
- %load obstacles.mat
- obstacles = [];
-
+ load obstacles.mat
+ %obstacles = [];
+ load waypoints.mat
+ 
+% obstacles(:,[1:3]) = obstacles(:,[4:6]);
+obstacles(:,3) = -obstacles(:,3); %-z in the data is up
+waypoints(:,3) = -waypoints(:,3);
+ 
  disp(['calculating closed form solution']);
  rrt = rrtstar(A,B,c,R);
  disp(['starting algorithm']);
 
- state_free = @(state, time_range)(is_state_free(state, state_limits, obstacles, quad_dim, time_range));
+ state_free = @(state, time_range)(quad_is_state_free(state, state_limits, obstacles, quad_radius, time_range));
  input_free = @(input, time_range)(is_input_free(input, input_limits, time_range));
- sample_state = @()(sample_free_states(state_limits, obstacles, quad_dim ));
- display = @(obj, tree, parents, goal_cost, goal_parent)(plot_graph(obj, tree, parents, goal_cost, goal_parent));
+ sample_state = @()(quad_sample_free_states(state_limits, obstacles, quad_radius ));
+ display = @(scratch, obj, tree, parents, goal_cost, goal_parent)(quad_plot_field(scratch, obj, tree, parents, obstacles, waypoints, goal', goal_cost, goal_parent));
 
  [T, parents] = rrt.run(sample_state, state_free, input_free, start', goal', display);

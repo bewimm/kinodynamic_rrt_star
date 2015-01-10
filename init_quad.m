@@ -1,12 +1,15 @@
 
-w = 4; %width
-h = 1; %height
-d = 4; %depth
-m = 1; %mass
-rotor_dist = 2;
+prop_diameter = 0.1397;
+rotor_dist = 0.25;
+w = rotor_dist+prop_diameter; %width (m)
+h = 0.1; %height (m)
+d = rotor_dist+prop_diameter; %depth (m)
+m = 0.26; %mass (kg)
 
 g = 9.81;
 
+%assume a spherical cow in a vacuum
+%or in this case a solid cuboid for the moments of inertia
 %I_h = 1/12*m*(w^2+d^2);
 I_w = 1/12*m*(h^2+d^2);
 I_d = 1/12*m*(h^2+w^2);

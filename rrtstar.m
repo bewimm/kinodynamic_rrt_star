@@ -25,7 +25,7 @@ classdef rrtstar
         eval_control_internal;
 
     end
-
+    
     methods
         function obj = rrtstar(A, B, c, R)
 
@@ -118,16 +118,17 @@ classdef rrtstar
             costs = [0];
             parents = [-1];
 
-            max_it = 1000;
-            r = 40;
+            max_it = 10000;
+            r = 20;
 
             goal_cost = inf;
             goal_parent = 0;
 
+            display_scratch = -1;
             for it=1:max_it
-
                 disp(['iteration ',num2str(it), ' of ', num2str(max_it)]);
                 sample_ok = false;
+                tic;
                 while ~sample_ok
 
                     x_i = sample_free_state();%sample_free_states(state_limits, obstacles, quad_dim);
@@ -150,6 +151,8 @@ classdef rrtstar
                 parents = [parents, min_idx];
                 costs = [costs, min_cost];
 
+                %if the cost is changed here all children should be
+                %reevaluated
                 for jj=1:size(T,2)
                     [cost, time] = evaluate_cost(obj, x_i,T(:,jj));
                     if cost < r && costs(end)+cost < costs(jj)
@@ -171,8 +174,8 @@ classdef rrtstar
                 end
 
                 T = [T,x_i];
-
-                display(obj, T, parents, goal_cost, goal_parent);
+                toc;
+                display_scratch = display(display_scratch, obj, T, parents, goal_cost, goal_parent);
 
             end
         end

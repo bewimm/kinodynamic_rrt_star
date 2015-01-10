@@ -1,4 +1,4 @@
-function [ ok ] = is_state_free( state, state_limits, obstacles, quad_dim, time_range )
+function [ ok ] = quad_is_state_free( state, state_limits, obstacles, radius, time_range )
 %IS_STATE_FREE returns true if the given state is valid
 % - state is the 10 dimensional state vector
 % - state_limits limits for the state variables
@@ -7,12 +7,12 @@ function [ ok ] = is_state_free( state, state_limits, obstacles, quad_dim, time_
 % - quad_dim contains the size of the quadcopter bounding-box
 
 ok = true;
-resolution = 20;
+max_dist = .1;
 
 if isa(state,'sym')
 
-    dt = time_range(2)-time_range(1);
-    r = [time_range(1):dt/resolution:time_range(2)];
+    %dt = time_range(2)-time_range(1);
+    r = [time_range(1):max_dist:time_range(2)];
 
     s = eval(subs(state,r));
 
@@ -22,11 +22,15 @@ if isa(state,'sym')
             ok = false;
             return;
         end
+        if collides(obstacles, radius, s)
+            ok = false;
+            return;
+        end
     end
 elseif isa(state, 'function_handle')
 
-    dt = time_range(2)-time_range(1);
-    r = [time_range(1):dt/resolution:time_range(2)];
+    %dt = time_range(2)-time_range(1);
+    r = [time_range(1):max_dist:time_range(2)];
 
     for jj=1:length(r)
         s = state(r(jj));
@@ -35,6 +39,10 @@ elseif isa(state, 'function_handle')
                 ok = false;
                 return;
             end
+        end
+        if collides(obstacles, radius, s)
+            ok = false;
+            return;
         end
     end
 
@@ -45,34 +53,41 @@ else
             return;
         end
     end
+    if collides(obstacles, radius, state)
+        ok = false;
+        return;
+    end
+end
+
 end
 
 
-
-max_dim = max(max(quad_dim));
+function [coll] = collides(obstacles, radius, s)
 
 n_obs = size(obstacles, 1);
+coll = false;
 for ii=1:n_obs
-
-    a = obstacles(ii,1:3);
-    b = a+[obstacles(ii, 4), 0, 0];
-    c = a+[0, obstacles(ii, 5), 0];
-    d = a+[0, 0, obstacles(ii, 6)];
-    e = a+[obstacles(ii, 4), obstacles(ii, 5), 0];
-    f = a+[obstacles(ii, 4), 0, obstacles(ii, 6)];
-    g = a+[0, obstacles(ii, 5), obstacles(ii, 6)];
-    h = a+obstacles(ii, 4:6);
-
-    p = state(1:3)';
-    maxd = max_dim^2;
-
-    if (p-a)*(p-a)' < maxd || (p-b)*(p-b)' < maxd || (p-c)*(p-c)' < maxd || (p-d)*(p-d)' < maxd ...
-            || (p-e)*(p-e)' < maxd || (p-f)*(p-f)' < maxd || (p-g)*(p-g)' < maxd || (p-h)*(p-h)' < maxd
-        ok = false;
-        return
+    
+    obs = obstacles(ii,:)';
+    obs(1:3) = obs(1:3)-obs(4:6)/2;
+    
+    c_min_bl = s(1:3)-obs(1:3);
+    c_min_tr = s(1:3)-(obs(1:3)+obs(4:6));
+    
+    if s(1)>obs(1) && s(1)<obs(1)+obs(4) && s(2)>obs(2) && s(2)<obs(2)+obs(5) && s(3)>obs(3) && s(3)<obs(3)+obs(6)
+        coll = true;
+        return;
     end
-
+     
+    closest = min(max(s(1:3),obs(1:3)),obs(1:3)+obs(4:6));
+    d = s(1:3)-closest;
+    if sum(d.^2) < radius^2
+        coll = true;
+        return;
+    end
+    
+    
 end
-
+            
 end
 
