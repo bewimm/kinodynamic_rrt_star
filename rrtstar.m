@@ -18,6 +18,8 @@ classdef rrtstar
         states_eq = [];
         control_eq = [];
         cost_eq = [];
+        
+        timings = [];
 
         eval_arrival_internal;
         eval_cost_internal;
@@ -81,10 +83,11 @@ classdef rrtstar
 
         end
 
-        function [cost, time] = evaluate_cost(obj, x0_, x1_)
+        function [cost, time] = evaluate_cost(obj, x0_, x1_, time)
 
-            time = obj.evaluate_arrival_time(x0_, x1_);
-
+            if ~exist('time','var') || isempty(time)
+                time = obj.evaluate_arrival_time(x0_, x1_);
+            end
             %c = subs(obj.cost_eq, obj.x0, x0_);
             %c = subs(c, obj.x1, x1_);
             %c = subs(c, obj.t_s, time);
@@ -94,9 +97,11 @@ classdef rrtstar
             cost = obj.eval_cost_internal(in{:});
         end
 
-        function [states, inputs] = evaluate_states_and_inputs(obj, x0_, x1_)
+        function [states, inputs] = evaluate_states_and_inputs(obj, x0_, x1_, time)
 
-            time = obj.evaluate_arrival_time(x0_, x1_);
+            if ~exist('time','var') || isempty(time)
+                time = obj.evaluate_arrival_time(x0_, x1_);
+            end
 
             %s = subs(obj.states_eq, obj.x0, x0_);
             %s = subs(s, obj.x1, x1_);
@@ -119,6 +124,7 @@ classdef rrtstar
             parents = [-1];
             children = {[]};
             is_terminal = [false];
+            cost_to_goal = [inf];
 
             max_it = 10000;
             r = 1000;
@@ -148,7 +154,7 @@ classdef rrtstar
 
                         [cost, time] = evaluate_cost(obj, node,x_i);
                         if cost < r && costs(node_idx)+cost < min_cost
-                            [states, u] = evaluate_states_and_inputs(obj, node,x_i);
+                            [states, u] = evaluate_states_and_inputs(obj,node,x_i,time);
                             if  is_state_free(states,[0,time]) && is_input_free(u,[0,time])
                                 sample_ok = true;
                                 min_idx = node_idx;
@@ -168,26 +174,30 @@ classdef rrtstar
                 costs = [costs, min_cost];
                 T = [T,x_i];
                 is_terminal = [is_terminal, false];
+                cost_to_goal = [cost_to_goal, inf];
 
                 %update the tree with new shorter paths (the root node is checked here even though it's not necessary)
                 stack(1).index = 1;
-                stack(1).cost = 0;
+                stack(1).improvement = 0;
 
                 while ~isempty(stack)
                     node = stack(end);
                     stack = stack(1:end-1);
                     state = T(:,node.index);
 
+                    costs(node.index) = costs(node.index)-node.improvement;
                     if is_terminal(node.index)
-                       continue;
+                        if costs(node.index)+cost_to_goal(node.index) < goal_cost
+                            goal_cost = costs(node.index)+cost_to_goal(node.index);
+                            goal_parent = node.index;
+                        end
+                        continue;
                     end
-
-                    costs(node.index) = costs(node.index)-node.cost;
-                    diff = node.cost;
+                    diff = node.improvement;
 
                     [cost, time] = evaluate_cost(obj, x_i,state);
                     if cost < r && costs(end)+cost < costs(node.index)
-                        [states, u] = evaluate_states_and_inputs(obj,x_i,state);
+                        [states, u] = evaluate_states_and_inputs(obj,x_i,state,time);
                         if is_state_free(states,[0,time]) && is_input_free(u,[0,time])
 
                             old_cost = costs(node.index);
@@ -203,24 +213,29 @@ classdef rrtstar
 
                     for jj=1:length(children{node.index})
                        stack(end+1).index = children{node.index}(jj);
-                       stack(end).cost = diff;
+                       stack(end).improvement = diff;
                     end
 
                 end
 
                 [cost, time] = evaluate_cost(obj, x_i, goal);
                 if costs(end)+cost < goal_cost
-                    [states, u] = evaluate_states_and_inputs(obj, x_i,goal);
+                    [states, u] = evaluate_states_and_inputs(obj, x_i,goal,time);
                     if is_state_free(states,[0,time]) && is_input_free(u,[0,time])
                         goal_cost = costs(end)+cost;
                         goal_parent = it+1;
                         is_terminal(end) = true;
+                        cost_to_goal(end) = cost;
                     end
                 end
 
-                toc;
+                obj.timings = [obj.timings, toc()];
                 display_scratch = display(display_scratch, obj, T, parents, goal_cost, goal_parent);
 
+                if mod(length(obj.timings),50) == 1 && length(obj.timings) > 50
+                   disp(['time for the last 50 iterations: ', num2str(sum(obj.timings(end-50:end))),' seconds']); 
+                end
+                
             end
         end
 
