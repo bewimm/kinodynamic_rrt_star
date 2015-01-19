@@ -11,6 +11,7 @@ classdef rrtstar
         t = sym('t', 'positive');
         x = sym('x', 'positive'); %used for integration
         t_s = sym('t_s', 'real'); %optimal arrival time
+        min_dist = sym('d', 'real');
 
         x0 = [];
         x1 = [];
@@ -18,6 +19,7 @@ classdef rrtstar
         states_eq = [];
         control_eq = [];
         cost_eq = [];
+        distance_eq = [];
         
         timings = [];
 
@@ -25,11 +27,12 @@ classdef rrtstar
         eval_cost_internal;
         eval_states_internal;
         eval_control_internal;
+        eval_time_for_distance_internal;
 
     end
     
     methods
-        function obj = rrtstar(A, B, c, R)
+        function obj = rrtstar(A, B, c, R, dist_idxs)
 
             if rank(ctrb(A,B)) ~= size(A,1)
                 disp('System is not controllable - aborting');
@@ -47,14 +50,17 @@ classdef rrtstar
             obj.x1 = sym('x1',[state_dims,1]);
             obj.x1 = sym(obj.x1, 'real');
 
-            [obj.best_arrival, obj.states_eq, obj.control_eq, obj.cost_eq] = obj.calc_equations(obj.A_,obj.B_,obj.R_,obj.c_);
+            if ~exist('dist_idxs','var') || isempty(dist_idxs)
+                dist_idxs = 1:size(B,1);
+            end
+
+            [obj.best_arrival, obj.states_eq, obj.control_eq, obj.cost_eq, obj.distance_eq] = obj.calc_equations(obj.A_,obj.B_,obj.R_,obj.c_,dist_idxs);
 
 
             %%calculate the factors for the resulting polynomial explicitly
             p1 = [];
             it = 0;
             while it < 20 && length(p1) <= 1 %just so mupad knows it's a polynomial
-
                 p1 = feval(symengine,'coeff',simplifyFraction(obj.best_arrival*obj.t^it), obj.t, 'All');
                 it = it+1;
             end
@@ -68,6 +74,20 @@ classdef rrtstar
             obj.eval_cost_internal = matlabFunction(obj.cost_eq);
             obj.eval_states_internal = matlabFunction(obj.states_eq);
             obj.eval_control_internal = matlabFunction(obj.control_eq);
+
+            %%calculate the factors for the resulting polynomial explicitly
+            p1 = [];
+            it = 0;
+            while it < 20 && length(p1) <= 1 %just so mupad knows it's a polynomial
+                p1 = feval(symengine,'coeff',simplifyFraction(obj.distance_eq*obj.t^it), obj.t, 'All');
+                it = it+1;
+            end
+            if it > 20
+                disp('either the result is not a polynomial or the degree is too high');
+            end
+
+            p([obj.min_dist, obj.t_s, obj.x0', obj.x1']) = fliplr(p1);
+            obj.eval_time_for_distance_internal = matlabFunction(p);
 
         end
 
@@ -117,8 +137,25 @@ classdef rrtstar
 
         end
 
+        function [close_time] = get_time_for_distance_equal(obj, x0_, x1_, time, distance)
 
-        function [T, parents] = run(obj, sample_free_state, is_state_free, is_input_free, start, goal, display)
+            if isempty(obj.distance_eq)
+               close_time = obj.evaluate_arrival_time(x0_, x1_);
+               return;
+            end
+
+            if ~exist('time','var') || isempty(time)
+                time = obj.evaluate_arrival_time(x0_, x1_);
+            end
+
+            in = num2cell([distance, time, x0_', x1_']);
+            close_time = roots(obj.eval_time_for_distance_internal(in{:}));
+            close_time = close_time(imag(close_time)==0);
+            close_time = min(close_time(close_time>=0));
+
+        end
+
+        function [path_states, closest_end_state] = run(obj, sample_free_state, is_state_free, is_input_free, start, goal, display, max_distance)
             T = [start];
             costs = [0];
             parents = [-1];
@@ -126,11 +163,19 @@ classdef rrtstar
             is_terminal = [false];
             cost_to_goal = [inf];
 
-            max_it = 10000;
+            max_it = 5000;
             r = 1000;
 
             goal_cost = inf;
             goal_parent = 0;
+
+            [cost, time] = evaluate_cost(obj, start, goal);
+            [states, u] = evaluate_states_and_inputs(obj,start,goal,time);
+            if is_state_free(states,[0,time]) && is_input_free(u,[0,time])
+                disp('goal is reachable from the start node (optimal solution)');
+                max_it = 0;
+                goal_parent = 1;
+            end
 
             display_scratch = -1;
             for it=1:max_it
@@ -237,6 +282,24 @@ classdef rrtstar
                 end
                 
             end
+
+            next = goal_parent;
+            path_states = goal;
+            while next ~= -1
+                path_states = [T(:,next) ,path_states];
+                next = parents(next);
+            end
+
+            if ~exist('max_distance','var') || isempty(max_distance)
+                closest_end_state = goal;
+            else
+                src = T(:,goal_parent);
+                best_t = obj.evaluate_arrival_time(src, goal);
+                close_t = get_time_for_distance_equal(obj, src, goal, best_t, max_distance);
+                [s, ~] = evaluate_states_and_inputs(obj, src, goal, best_t);
+                closest_end_state = s(close_t);
+            end
+
         end
 
 
@@ -244,7 +307,7 @@ classdef rrtstar
 
     methods (Access = protected)
 
-        function [tau_star, states, control, cost] = calc_equations(obj, A, B, R, c)
+        function [tau_star, states, control, cost, sq_distance] = calc_equations(obj, A, B, R, c, dist_idxs)
             %the solution of the equation 'tau_star = 0' gives the best arrival time
             %states, control, and cost depend on t_s which is the solution from above
             state_dims = size(A,1);
@@ -255,12 +318,15 @@ classdef rrtstar
             d = G\(obj.x1-x_bar);
             tau_star = 1-2*(A*obj.x1+c)'*d-d'*B/R*B'*d;
 
-
             solution = expm([A, B/R*B';zeros(state_dims), -A']*(obj.t-obj.t_s))*[obj.x1;subs(d,obj.t,obj.t_s)]+ ...
                 int(expm([A, B/R*B';zeros(state_dims), -A']*(obj.t-obj.x))*[c; zeros(state_dims,1)],obj.x,obj.t_s,obj.t);
 
             control = R\B'*solution(state_dims+1:2*state_dims,:);
             states = solution(1:state_dims);
+
+            if exist('dist_idxs','var')
+                sq_distance = sum((obj.x1(dist_idxs)-states(dist_idxs)).^2)-obj.min_dist^2;
+            end
 
             cost = int(1+control'*R*control, obj.t, 0, obj.t_s);
 
