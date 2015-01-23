@@ -43,7 +43,7 @@ disp(['starting algorithm']);
 state_free = @(state, time_range)(ball_is_state_free(state, state_limits, obstacles, radius, time_range));
 input_free = @(input, time_range)(is_input_free(input, input_limits, time_range));
 sample_state = @()(ball_sample_free_states(state_limits, obstacles, radius ));
-display = @(scratch, obj, tree, parents, goal_cost, goal_parent)(ball_plot_field(scratch, obj, tree, parents, obstacles, goal', goal_cost, goal_parent));
+display = @(scratch, obj, tree, parents, goal, goal_cost, goal_parent)(ball_plot_field(scratch, obj, tree, parents, obstacles, goal, goal_cost, goal_parent));
 
 
 [T, parents] = rrt.run(sample_state, state_free, input_free, start', goal', display);

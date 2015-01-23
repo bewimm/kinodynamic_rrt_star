@@ -5,7 +5,7 @@ function [ scratch ] = quad_plot_field(scratch, obj, tree, parents, obstacles, w
 if ~isa(scratch,'struct') 
     %plot obstacles and waypoints    
     hold on;
-    scratch = struct('last_parents', -1, 'trajectory_handles', -1, 'last_cost', inf, 'path_handles', []);
+    scratch = struct('figure_handle',gcf(),'last_parents', -1, 'trajectory_handles', -1, 'last_cost', inf, 'path_handles', []);
     for ii=1:size(obstacles,1)
         obs = obstacles(ii,:);   
         obs(1:3) = obs(1:3)-obs(4:6)/2;
@@ -74,6 +74,7 @@ if goal_cost < scratch.last_cost
     scratch.last_cost = goal_cost;
 end
 
+set(0, 'CurrentFigure', scratch.figure_handle);
 xlabel('x');
 ylabel('y');
 zlabel('z');

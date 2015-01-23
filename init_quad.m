@@ -6,6 +6,8 @@ h = 0.1; %height (m)
 d = rotor_dist+prop_diameter; %depth (m)
 m = 0.26; %mass (kg)
 
+rotor_to_com = rotor_dist/2;
+
 g = 9.81;
 
 %assume a spherical cow in a vacuum
@@ -25,7 +27,7 @@ A(7:8,9:10) = eye(2);
 B=zeros(state_dims, input_dims);
 
 B(4:6,1) = [0,0,1/m]';
-B(9:10,2:3) = diag([rotor_dist/I_w, rotor_dist/I_d]);
+B(9:10,2:3) = diag([rotor_to_com/I_w, rotor_to_com/I_d]);
 
 c = zeros(state_dims,1);
 
