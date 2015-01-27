@@ -169,7 +169,7 @@ classdef rrtstar
         function [path_states, closest_end_state] = run(obj, sample_free_state, is_state_free, is_input_free, start, goal, display, max_distance)
             T = [start];
             costs = [0];
-            times = [1];
+            times = [0];
             parents = [-1];
             children = {[]};
             is_terminal = [false];
@@ -239,6 +239,7 @@ classdef rrtstar
                 T = [T,x_i];
                 is_terminal = [is_terminal, false];
                 cost_to_goal = [cost_to_goal, inf];
+                time_to_goal = [time_to_goal, inf];
 
                 %update the tree with new shorter paths (the root node is checked here even though it's not necessary)
                 stack(1).index = 1;
@@ -255,7 +256,7 @@ classdef rrtstar
                     if is_terminal(node.index)
                         if costs(node.index)+cost_to_goal(node.index) < goal_cost
                             goal_cost = costs(node.index)+cost_to_goal(node.index);
-                            goal_time = time(node.index)+time_to_goal(node.index);
+                            goal_time = times(node.index)+time_to_goal(node.index);
                             goal_parent = node.index;
                         end
                         continue;
